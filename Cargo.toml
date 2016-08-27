@@ -1,5 +1,5 @@
 [package]
-name = "bytesize"
+name = "bytestool"
 version = "0.1.0"
 authors = ["Frank Rehberger <frehberg@gmail.com>"]
 
