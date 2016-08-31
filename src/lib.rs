@@ -1,6 +1,6 @@
 #![crate_type="dylib"]
 #![feature(plugin_registrar, rustc_private)]
- #[allow(unused)]
+#[allow(unused)]
 
 extern crate syntax;
 extern crate rustc_plugin;
@@ -9,93 +9,248 @@ use syntax::ext::base::ExtCtxt;
 use syntax::codemap::Span;
 use syntax::ext::build::AstBuilder;
 use syntax::ast;
+// see: https://github.com/rust-lang/rfcs/pull/566
 
 use syntax::parse::token::*;
-use syntax::tokenstream::TokenTree;
-use syntax::ext::base::{ MacResult, MacEager, DummyResult};
+use syntax::tokenstream::{TokenTree, Delimited};
+use syntax::ext::base::{MacResult, MacEager, DummyResult};
 use rustc_plugin::Registry;
+use std::rc::Rc;
 use syntax::ptr::P;
+
 
 #[plugin_registrar]
 pub fn plugin_registrar(reg: &mut Registry) {
-    reg.register_macro("bytesize", expand_bs);
+    reg.register_macro("byte_size_of", bs_expand);
+    reg.register_macro("concat_bytes", concat_expand);
 }
 
-fn expand_lit(cx: &mut ExtCtxt, 
-    sp: Span, 
-    l : &syntax::codemap::Spanned<syntax::ast::LitKind> ) 
-->  Box<MacResult + 'static>
-{
+
+fn bs_expand(cx: &mut ExtCtxt, sp: Span, args: &[TokenTree]) -> Box<MacResult + 'static> {
+
+    // TODO verify single arg
+    let result = extract_vec_from_token(cx, sp, &args[0]);
+    let bytevec = match result {
+        Ok(bytes) => bytes,
+        Err(syntax_err) => return syntax_err,
+    };
+
+    MacEager::expr(cx.expr_usize(sp, bytevec.len()))
+}
+
+
+fn extract_vec_from_lit(cx: &mut ExtCtxt,
+                        sp: Span,
+                        l: &syntax::codemap::Spanned<syntax::ast::LitKind>)
+                        -> Result<Vec<u8>, Box<MacResult + 'static>> {
     let lit = &l.node;
-    
-    let len = match lit {
-        &ast::LitKind::ByteStr(ref str) => (*str).len(),
+
+    match lit {
+        // TODO should not clone inner value
+        &ast::LitKind::ByteStr(ref str) => {
+            let x: &Rc<Vec<u8>> = str;
+            return Ok(x.as_ref().clone());
+        }
         _ => {
-            cx.span_err(sp, &format!("expecting raw string b\"..\" but got {:?}", lit));
-            return DummyResult::any(sp); 
+            cx.span_err(sp,
+                        &format!("expecting raw string b\"..\" but got {:?}", lit));
+            return Err(DummyResult::any(sp));
         }
     };
-   
-    MacEager::expr(cx.expr_usize(sp, len))    
 }
 
-fn expand_ast_expr(cx: &mut ExtCtxt, sp: Span, e: &syntax::ast::Expr) 
-->  Box<MacResult + 'static>
-{
+
+fn extract_u8_from_lit(cx: &mut ExtCtxt,
+                       sp: Span,
+                       l: &syntax::codemap::Spanned<syntax::ast::LitKind>)
+                       -> Result<u8, Box<MacResult + 'static>> {
+    let lit = &l.node;
+
+    match lit {
+        // TODO should not clone inner value
+        &ast::LitKind::Int(byte, ast::LitIntType::Unsigned(ast::UintTy::U8)) => {
+            return Ok(byte as u8);
+        }
+        _ => {
+            cx.span_err(sp, &format!("expecting u8 b\"..\" but got {:?}", lit));
+            return Err(DummyResult::any(sp));
+        }
+    };
+}
+
+
+fn extract_vec_from_vec(cx: &mut ExtCtxt,
+                        sp: Span,
+                        expr_vec: &Vec<P<syntax::ast::Expr>>)
+                        -> Result<Vec<u8>, Box<MacResult + 'static>> {
+    let mut result = Vec::new();
+
+    for expr in expr_vec {
+        let kind = &expr.node;
+        match kind {
+            // TODO should not clone inner value
+            &ast::ExprKind::Lit(ref l) => {
+                match extract_u8_from_lit(cx, sp, l) {
+                    Ok(byte) => result.push(byte),
+                    Err(err_msg) => {
+                        return Err(err_msg);
+                    }
+                }
+            }
+            _ => {
+                cx.span_err(sp,
+                            &format!("expecting raw string b\"..\" but got {:?}", expr_vec));
+                return Err(DummyResult::any(sp));
+            }
+        };
+    }
+
+    return Ok(result);
+}
+
+fn extract_vec_from_ast_expr(cx: &mut ExtCtxt,
+                             sp: Span,
+                             e: &syntax::ast::Expr)
+                             -> Result<Vec<u8>, Box<MacResult + 'static>> {
     let node = &e.node;
-    
+
     match node {
         // TODO: borrow without cloning
-        &ast::ExprKind::Lit(ref l) => return expand_lit(cx, sp, &(*l).clone().unwrap() ),
-         _ =>  {
-             cx.span_err(sp, &format!("expecting raw string b\"..\" but got {:?}", e ));
-             return DummyResult::any(sp); 
-         }   
-     };
+        &ast::ExprKind::Lit(ref l) => return extract_vec_from_lit(cx, sp, &(*l).clone().unwrap()),
+        &ast::ExprKind::Vec(ref v) => return extract_vec_from_vec(cx, sp, &(*v).clone()),
+        _ => {
+            cx.span_err(sp, &format!("expecting raw string b\"..\" but got {:?}", e));
+            return Err(DummyResult::any(sp));
+        }
+    };
 }
 
-fn expand_nonterminal(cx: &mut ExtCtxt, 
-    sp: Span, 
-    nt: &Nonterminal) 
-->  Box<MacResult + 'static>
-{
-    match nt {          
+fn extract_vec_from_nonterminal(cx: &mut ExtCtxt,
+                                sp: Span,
+                                nt: &Nonterminal)
+                                -> Result<Vec<u8>, Box<MacResult + 'static>> {
+    match nt {
         &NtExpr(ref p) => {
             // TODO: borrow without cloning
-            return expand_ast_expr(cx, sp, &(*p).clone().unwrap() );
-        },
+            return extract_vec_from_ast_expr(cx, sp, &(*p).clone().unwrap());
+        }
         _ => {
-            cx.span_err(sp, &format!("expecting raw string b\"..\" but got {:?}", nt));
-            return DummyResult::any(sp); 
+            cx.span_err(sp,
+                        &format!("expecting raw string b\"..\" but got {:?}", nt));
+            return Err(DummyResult::any(sp));
         }
     }
 }
 
-fn expand_literal(cx: &mut ExtCtxt, sp: Span, lit: & Lit) ->  Box<MacResult + 'static>
-{
-    let len = match lit {
-        &Lit::ByteStr(str) => str.as_str().len(),
-        _ => {
-            cx.span_err(sp, &format!("expecting raw string b\"..\" but got {:?}", lit));
-            return DummyResult::any(sp); 
+
+fn extract_vec_from_delimited(cx: &mut ExtCtxt,
+                              sp: Span,
+                              del: &Delimited)
+                              -> Result<Vec<u8>, Box<MacResult + 'static>> {
+    let mut res = Vec::new();
+
+    for (idx, elem) in del.tts.iter().enumerate() {
+        match elem {
+            &TokenTree::Token(sp, Comma) => {
+                if idx % 2 == 0 {
+                    cx.span_err(sp,
+                                &format!("argument {}, expecting raw string b\"..\" but found \
+                                          ',' ",
+                                         (idx / 2)));
+                    return Err(DummyResult::any(sp));
+                } else {
+                    continue;
+                }
+            }
+            &TokenTree::Token(sp, Literal(ref lit, _)) => {
+                match lit {
+                    &Lit::Integer(intstr) => {
+                        match intstr.as_str().parse::<u8>() {
+                            Ok(int) => res.push(int),
+                            _ => {
+                                cx.span_err(sp, &format!("expecting u8 but got {:?}", intstr));
+                                return Err(DummyResult::any(sp));
+                            }
+                        }
+                    }
+                    _ => {
+                        cx.span_err(sp, &format!("expecting u8 but got {:?}", elem));
+                        return Err(DummyResult::any(sp));
+                    }
+                }
+            }
+            _ => {
+                cx.span_err(sp, &format!("expecting [u8] but got {:?}", elem));
+                return Err(DummyResult::any(sp));
+            }
         }
-    };
-   
-    MacEager::expr(cx.expr_usize(sp, len))    
+    }
+
+    return Ok(res);
 }
 
 
-fn expand_bs(cx: &mut ExtCtxt, sp: Span, args: &[TokenTree])
-        -> Box<MacResult + 'static> {
-            
-    let result = match &args[0] {
-       &TokenTree::Token(_, Literal(ref lit,_)) => expand_literal(cx, sp, lit),
-       &TokenTree::Token(_, Interpolated(ref nt)) => expand_nonterminal(cx, sp, nt), // macro
-       _ => {
-            cx.span_err(sp, &format!("expecting raw string b\"..\" but got {:?}", &args[0] ) );
-            return DummyResult::any(sp); 
+fn extract_vec_from_literal(cx: &mut ExtCtxt,
+                            sp: Span,
+                            lit: &Lit)
+                            -> Result<Vec<u8>, Box<MacResult + 'static>> {
+    match lit {
+        &Lit::ByteStr(str) => return Ok(str.as_str().as_bytes().to_vec()),
+        _ => {
+            cx.span_err(sp,
+                        &format!("expecting raw string b\"..\" but got {:?}", lit));
+            return Err(DummyResult::any(sp));
         }
     };
-    
-    return result;
- }
+}
+
+
+fn extract_vec_from_token(cx: &mut ExtCtxt,
+                          sp: Span,
+                          token: &TokenTree)
+                          -> Result<Vec<u8>, Box<MacResult + 'static>> {
+    match token {
+        &TokenTree::Token(sp, Literal(ref lit, _)) => return extract_vec_from_literal(cx, sp, lit),
+        &TokenTree::Token(sp, Interpolated(ref nt)) => {
+            return extract_vec_from_nonterminal(cx, sp, nt)
+        } // macro
+        &TokenTree::Delimited(sp, ref delimited) => {
+            return extract_vec_from_delimited(cx, sp, delimited.as_ref())
+        }
+        _ => {
+            cx.span_err(sp,
+                        &format!("expecting raw string b\"..\" but got {:?}", token));
+            return Err(DummyResult::any(sp));
+        }
+    }
+}
+
+
+fn concat_expand(cx: &mut ExtCtxt, sp: Span, args: &[TokenTree]) -> Box<MacResult + 'static> {
+    let mut con: Vec<u8> = Vec::new();
+
+    for (idx, token) in args.iter().enumerate() {
+        match token {
+            &TokenTree::Token(sp, Comma) => {
+                if idx % 2 == 0 {
+                    cx.span_err(sp,
+                                &format!("argument {}, expecting raw string b\"..\" but found \
+                                          ',' ",
+                                         (idx / 2)));
+                    return DummyResult::any(sp);
+                } else {
+                    continue;
+                }
+            }
+            _ => {
+                let result = extract_vec_from_token(cx, sp, token);
+                match result {
+                    Ok(bytes) => con.extend(bytes),
+                    Err(syntax_err) => return syntax_err,
+                }
+            }
+        }
+    }
+    let rc = Rc::new(con);
+    return MacEager::expr(cx.expr_lit(sp, ast::LitKind::ByteStr(rc)));
+}

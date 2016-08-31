@@ -1,10 +1,9 @@
 [package]
-name = "bytestool"
+name = "test-bytestool"
 version = "0.1.0"
 authors = ["Frank Rehberger <frehberg@gmail.com>"]
 
-[lib]
-name = "bytestool"
-plugin = true
 
-[dependencies]
+[dependencies.bytestool]
+path    = ".."
+version = "*"
