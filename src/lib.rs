@@ -28,7 +28,12 @@ pub fn plugin_registrar(reg: &mut Registry) {
 
 fn bs_expand(cx: &mut ExtCtxt, sp: Span, args: &[TokenTree]) -> Box<MacResult + 'static> {
 
-    // TODO verify single arg
+    if args.len() != 1 {
+        cx.span_err(sp,
+                    &format!("expecting single argument but got {:?}", args.len()));
+        return DummyResult::any(sp);
+    }
+
     let result = extract_vec_from_token(cx, sp, &args[0]);
     let bytevec = match result {
         Ok(bytes) => bytes,

@@ -3,20 +3,11 @@
 #![plugin(bytestool)]
 #![feature(type_ascription)]
 
-use std::time::Duration;
-use std::thread;
-use std::io::stdout;
-use std::io::Write;
-use std::string;
-
-
-
-#[macro_export]
 macro_rules! assemble {
     ($bstr1:expr, $bstr2:expr) => {{
-            const len1 : usize = byte_size_of!($bstr1);
-            const len2 : usize = byte_size_of!($bstr2);
-            let result : &[u8; len1 + len2] = concat_bytes!($bstr1, $bstr2);
+            const LEN1 : usize = byte_size_of!($bstr1);
+            const LEN2 : usize = byte_size_of!($bstr2);
+            let result : &[u8; LEN1 + LEN2] = concat_bytes!($bstr1, $bstr2);
             result
     }};
 }
