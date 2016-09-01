@@ -3,7 +3,7 @@ name = "bytestool"
 version = "0.2.0"
 authors = ["Frank Rehberger <frehberg@gmail.com>"]
 license = "Apache-2.0"
-description = "Compiler plugins by example:  byte_size_of(b"0123") returning length of byte-string (4), concat_bytes!([0u8], b"123") forming a single byte array b"0123".
+description = "Compiler plugins: compile time byte_size_of!(..) and concat_bytes!(..)" 
 documentation = "https://github.com/frehberg/rust-bytestool"
 
 [lib]
