@@ -30,7 +30,7 @@ fn bs_expand(cx: &mut ExtCtxt, sp: Span, args: &[TokenTree]) -> Box<MacResult + 
 
     if args.len() != 1 {
         cx.span_err(sp,
-                    &format!("expecting single argument but got {:?}", args.len()));
+                    &format!("expecting single argument"));
         return DummyResult::any(sp);
     }
 
