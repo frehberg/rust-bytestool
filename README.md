@@ -3,12 +3,14 @@ Compiler plugin to handle constant byte expressions: concatinating byte strings 
 
 The compiler plugin allows you to handle byte (u8) arrays and combine them, for example to form constant network messages. The array may be immutable and formed at compilation time.
 
+Cargo.toml
 ```init
 ...
 [dependencies]
 bytestool = "0.2.0"
 ```
 
+src/main.rs
 ```rust
 #![feature(asm)]
 #![feature(plugin)]
