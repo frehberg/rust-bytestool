@@ -5,7 +5,6 @@ The compiler plugin allows you to handle byte (u8) arrays and combine them, for 
 
 example: Cargo.toml dependency
 ```init
-...
 [dependencies]
 bytestool = "0.2.0"
 ...
