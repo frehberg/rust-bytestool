@@ -9,7 +9,7 @@ example: Cargo.toml dependency
 bytestool = "0.2.0"
 ```
 
-example: forming a constant message to be sent over network
+example src/main.rs: forming a constant message to be sent over network
 ```rust
 #![feature(asm)]
 #![feature(plugin)]
