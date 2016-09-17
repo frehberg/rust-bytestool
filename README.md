@@ -8,8 +8,7 @@ example: Cargo.toml dependency
 ...
 [dependencies]
 bytestool = "0.2.0"
-
-```
+...
 
 example: forming a constant message to be sent over network
 ```rust
