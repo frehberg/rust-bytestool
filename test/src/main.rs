@@ -3,7 +3,7 @@
 #![plugin(bytestool)]
 #![feature(type_ascription)]
 
-macro_rules! assemble {
+macro_rules! build_const_mesg {
     ($bstr1:expr, $bstr2:expr) => {{
             const LEN1 : usize = byte_size_of!($bstr1);
             const LEN2 : usize = byte_size_of!($bstr2);
@@ -12,6 +12,19 @@ macro_rules! assemble {
     }};
 }
 
+fn send_hello()
+{
+   let mesg_hello = build_const_mesg!(b"HELLO", [23u8, 10u8, 10u8, 0u8] );
+
+   // send out the byte message via network
+}
+
+fn send_bye()
+{
+   let mesg_bye   = build_const_mesg!(b"BYE",   [23u8, 10u8, 10u8, 0u8] );
+
+   // send out the byte message via network
+}
 fn main() {}
 
 #[cfg(test)]
