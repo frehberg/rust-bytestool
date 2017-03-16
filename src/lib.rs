@@ -122,7 +122,7 @@ fn extract_vec_from_ast_expr(cx: &mut ExtCtxt,
     match node {
         // TODO: borrow without cloning
         &ast::ExprKind::Lit(ref l) => return extract_vec_from_lit(cx, sp, &(*l).clone().unwrap()),
-        &ast::ExprKind::Vec(ref v) => return extract_vec_from_vec(cx, sp, &(*v).clone()),
+        &ast::ExprKind::Array(ref v) => return extract_vec_from_vec(cx, sp, &(*v).clone()),
         _ => {
             cx.span_err(sp, &format!("expecting raw string b\"..\" but got {:?}", e));
             return Err(DummyResult::any(sp));

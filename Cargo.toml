@@ -1,6 +1,6 @@
 [package]
 name = "bytestool"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Frank Rehberger <frehberg@gmail.com>"]
 license = "Apache-2.0"
 description = "Compiler plugins: compile time byte_size_of!(..) and concat_bytes!(..)" 
